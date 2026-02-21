@@ -8,7 +8,7 @@ from datetime import datetime, date
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, send_file, jsonify, g)
-import pdfplumber
+from pdfminer.high_level import extract_text as pdfminer_extract
 import csv
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -18,7 +18,10 @@ from openpyxl.styles import Font, PatternFill, Alignment
 # ──────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-DB_PATH = os.path.join(os.path.dirname(__file__), "convertfin.db")
+
+# Usa /tmp no Render (sem disco persistente no free tier) ou diretório local
+_base_dir = os.environ.get("RENDER_PROJECT_DIR", os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(_base_dir, "convertfin.db")
 
 FREE_LIMIT     = 5          # conversões gratuitas por mês
 PRO_PRICE      = "29,99"
@@ -239,20 +242,12 @@ def parse_tables_to_rows(tables, bank):
     return rows
 
 def convert_pdf(file_bytes):
-    """Pipeline principal de conversão."""
-    full_text, all_tables = "", []
-    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-        for page in pdf.pages:
-            t = page.extract_text() or ""
-            full_text += t + "\n"
-            tables = page.extract_tables()
-            if tables:
-                all_tables.extend(tables)
+    """Pipeline principal de conversão — usa pdfminer.six (puro Python)."""
+    # Extrai texto de todas as páginas
+    full_text = pdfminer_extract(io.BytesIO(file_bytes)) or ""
 
     bank = detect_bank(full_text)
-    rows = parse_tables_to_rows(all_tables, bank) if all_tables else []
-    if not rows:
-        rows = parse_text_to_rows(full_text, bank)
+    rows = parse_text_to_rows(full_text, bank)
 
     # Ordenar por data
     def parse_date(r):
