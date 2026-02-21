@@ -19,9 +19,8 @@ from openpyxl.styles import Font, PatternFill, Alignment
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
-# Usa /tmp no Render (sem disco persistente no free tier) ou diretório local
-_base_dir = os.environ.get("RENDER_PROJECT_DIR", os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(_base_dir, "convertfin.db")
+# os.getcwd() é sempre o diretório do projeto, tanto local quanto no Render
+DB_PATH = os.path.join(os.getcwd(), "convertfin.db")
 
 FREE_LIMIT     = 5          # conversões gratuitas por mês
 PRO_PRICE      = "29,99"
